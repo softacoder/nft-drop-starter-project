@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Program, Provider, web3 } from "@project-serum/anchor";
 import { MintLayout, TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
@@ -26,6 +26,7 @@ const CandyMachine = ({ walletAddress }) => {
     },
     []
   );
+  const [candyMachine, setCandyMachine] = useState(null);
 
   const getProvider = () => {
     const rpcHost = process.env.REACT_APP_SOLANA_RPC_HOST;
@@ -45,6 +46,91 @@ const CandyMachine = ({ walletAddress }) => {
     const candyMachine = await program.account.candyMachine.fetch(
       process.env.REACT_APP_CANDY_MACHINE_ID
     );
+    const itemsAvailable = candyMachine.data.itemsAvailable.toNumber();
+    const itemsRedeemed = candyMachine.itemsRedeemed.toNumber();
+    const itemsRemaining = itemsAvailable - itemsRedeemed;
+    const goLiveDate = candyMachine.goLiveDate.toNumber();
+    const presale =
+      candyMachine.data.whitelistMintSetting &&
+      candyMachine.data.whitelistMintSetting.presale &&
+      (!candyMachine.data.goLiveDate ||
+        candyMachine.data.goLiveDate.toNumber() > new Date().getTime() / 1000);
+    // const goLiveDateTimeString = `${new Date(goLiveDate * 1000).toGMTString()}`;
+    // setCandyMachine({
+    //   id: process.env.REACT_APP_CANDY_MACHINE_ID,
+    //   program,
+    //   state: {
+    //     itemsAvailable,
+    //             itemsRedeemed,
+    //             itemsRemaining,
+    //             goLiveDate,
+    //             goLiveDateTimeString,
+    //             isSoldOut: itemsRating === 0,
+    //             isActive:
+    //               (presale ||
+    //                 candyMachine.data.goLiveDate.toNumber() <
+    //                 new Date().getTime() / 1000) &&
+    //               (candyMachine.endSettings
+    //                 ? candyMachine.endSettings.endSettingsType.date
+    //                   ? candyMachine.endSettings.number.toNumber() >
+    //                   new Date().getTime() / 1000
+    //                   : itemsRedeemed <
+    //                     candyMachine.endSettings.number.toNumber()
+    //                 : true),
+    //             isPresale: presale,
+    //             goLiveDate: candyMachine.data.goLiveDate,
+    //             treasury: candyMachine.wallet,
+    //             tokenMint: candyMachine.tokenMint,
+    //             gateKeeper: candyMachine.data.gatekeeper,
+    //             endSettings: candyMachine.data.endSettings,
+    //             whitelistMintSettings: candyMachine.data.whitelistMintSettings,
+    //             hiddenSettings: candyMachine.data.hiddenSettings,
+    //             price: candyMachine.data.price,
+    //               }
+    //             }):
+
+    const goLiveDateTimeString = `${new Date(goLiveDate * 1000).toGMTString()}`;
+
+    setCandyMachine({
+      id: process.env.REACT_APP_CANDY_MACHINE_ID,
+      program,
+      state: {
+        itemsAvailable,
+        itemsRedeemed,
+        itemsRemaining,
+        goLiveDate,
+        goLiveDateTimeString,
+        isSoldOut: itemsRating === 0,
+        // No end condition
+        isActive:
+          (presale ||
+            candyMachine.data.goLiveDate.toNumber() <
+              new Date().getTime() / 1000) &&
+          (candyMachine.endSettings
+            ? candyMachine.endSettings.endSettingsType.date
+              ? candyMachine.endSettings.number.toNumber() >
+                new Date().getTime() / 1000 // Date-based end condition
+              : itemsRedeemed < candyMachine.endSettings.number.toNumber() // Quantity-based end condition
+            : true),
+        isPresale: presale,
+        goLiveDate: candyMachine.data.goLiveDate,
+        treasury: candyMachine.wallet,
+        tokenMint: candyMachine.tokenMint,
+        gateKeeper: candyMachine.data.gatekeeper,
+        endSettings: candyMachine.data.endSettings,
+        whitelistMintSettings: candyMachine.data.whitelistMintSettings,
+        hiddenSettings: candyMachine.data.hiddenSettings,
+        price: candyMachine.data.price,
+      },
+    });
+
+    console.log({
+      itemsAvailable,
+      itemsRedeemed,
+      itemsRemaining,
+      goLiveDate,
+      goLiveDateTimeString,
+    });
   };
 
   const getCandyMachineCreator = async (candyMachine) => {
@@ -53,17 +139,6 @@ const CandyMachine = ({ walletAddress }) => {
       [Buffer.from("candy_machine"), candyMachineID.toBuffer()],
       candyMachineProgram
     );
-    const itemsAvailable = candyMachine.data.itemsAvailable.toNumber();
-    const itemsRedeemed = candyMachine.itemsRedeemed.toNumber();
-    const itemsRemaining = itemsAvailable - itemsRedeemed;
-    const goLiveDate = candyMachine.goLiveDate.toNumber();
-    const presale =
-      candyMachine.data.whitelistMintSetting &&
-      candyMachine.data.whitelistMintSetting.presale &&
-      (candyMachine.data.goLiveDate ||
-        candyMachine.data.goLiveDate.toNumber() > new Date().getTime() / 1000);
-    const goLiveDateTimeString = `${new Date(goLiveDate * 1000).toGMTString()}`;
-    console.log({});
   };
 
   const getMetadata = async (mint) => {
@@ -342,13 +417,18 @@ const CandyMachine = ({ walletAddress }) => {
   };
 
   return (
-    <div className="machine-container">
-      <p>Drop Date:</p>
-      <p>Items Minted:</p>
-      <button className="cta-button mint-button" onClick={mintToken}>
-        Mint NFT
-      </button>
-    </div>
+    candyMachine && (
+      <div className="machine-container">
+        <p>Drop Date: {candyMachine.state.goLiveDateTimeString}</p>
+        <p>
+          Items Minted: {candyMachine.state.itemsRedeemed} /
+          {candyMachine.state.itemsAvailable}
+        </p>
+        <button className="cta-button mint-button" onClick={mintToken}>
+          Mint NFT
+        </button>
+      </div>
+    )
   );
 };
 
